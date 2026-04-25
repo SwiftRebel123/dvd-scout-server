@@ -5,12 +5,18 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("DVD Scout server is running");
     return;
   }
 
@@ -56,6 +62,7 @@ Respond ONLY with valid JSON, no markdown, no extra text:
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(parsed));
       } catch (e) {
+        console.error("Scan error:", e);
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Something went wrong" }));
       }
@@ -67,6 +74,6 @@ Respond ONLY with valid JSON, no markdown, no extra text:
   res.end("Not found");
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`DVD Scout server running on port ${PORT}`);
 });
