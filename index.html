@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>DVD Scout</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --border-light: #333;
+    --text: #f0f0f0;
+    --text-secondary: #888;
+    --text-tertiary: #555;
+    --hot: #ff4d1c;
+    --hot-bg: #1f0a04;
+    --worth: #1dbd7e;
+    --worth-bg: #041a10;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+  #app { max-width: 480px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .logo-icon { width: 26px; height: 26px; background: var(--hot); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  h1 { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; }
+  .tagline { font-size: 12px; color: var(--text-secondary); font-family: 'DM Mono', monospace; }
+  #upload-zone { border: 1.5px dashed var(--border-light); border-radius: 12px; padding: 28px 16px; text-align: center; background: var(--surface); margin-bottom: 12px; }
+  .upload-title { font-size: 14px; font-weight: 600; color: var(--text); display: block; margin-bottom: 16px; }
+  .upload-btns { display: flex; gap: 10px; justify-content: center; }
+  .upload-btn { flex: 1; max-width: 160px; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg); color: var(--text-secondary); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; position: relative; }
+  .upload-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  #preview-wrap { display: none; margin-bottom: 12px; }
+  #preview-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); max-height: 240px; object-fit: cover; display: block; }
+  .retake-btns { display: flex; gap: 8px; margin-top: 8px; }
+  .retake-btn { flex: 1; padding: 8px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text-tertiary); font-size: 12px; cursor: pointer; position: relative; text-align: center; }
+  .retake-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  #analyze-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; background: var(--hot); color: #fff; font-size: 15px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; display: none; margin-bottom: 12px; transition: opacity 0.15s; }
+  #analyze-btn:hover { opacity: 0.88; }
+  #analyze-btn:disabled { opacity: 0.4; cursor: default; }
+  #status { display: none; text-align: center; padding: 14px; font-size: 13px; color: var(--text-secondary); font-family: 'DM Mono', monospace; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 12px; }
+  .status-dot { display: inline-block; width: 6px; height: 6px; background: var(--hot); border-radius: 50%; margin-right: 8px; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  #results { display: none; }
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .results-header h2 { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+  #reset-btn { font-size: 12px; color: var(--text-tertiary); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-family: 'DM Mono', monospace; }
+  .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); font-family: 'DM Mono', monospace; margin: 20px 0 8px; display: flex; align-items: center; gap: 8px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .count-pill { font-size: 10px; background: var(--border); color: var(--text-tertiary); padding: 1px 6px; border-radius: 10px; }
+  .title-row { display: flex; align-items: center; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); margin-bottom: 5px; gap: 8px; }
+  .title-row.hot-row { border-color: #2a1008; background: var(--hot-bg); }
+  .title-name { color: var(--text); font-size: 13px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .badge { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 4px; white-space: nowrap; font-family: 'DM Mono', monospace; }
+  .badge-hot { background: var(--hot); color: #fff; }
+  .badge-ok { color: var(--worth); border: 1px solid #0d3d28; background: var(--worth-bg); }
+  .badge-skip { color: var(--text-tertiary); border: 1px solid var(--border); }
+  .ebay-link { font-size: 11px; font-weight: 500; padding: 4px 9px; border-radius: 5px; border: 1px solid var(--border-light); color: var(--text-secondary); text-decoration: none; white-space: nowrap; font-family: 'DM Mono', monospace; }
+  .copy-btn { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); background: transparent; font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer; margin-top: 20px; font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <circle cx="7.5" cy="7.5" r="4.5" stroke="#fff" stroke-width="1.4"/>
+          <circle cx="7.5" cy="7.5" r="1.5" fill="#fff"/>
+        </svg>
+      </div>
+      <h1>DVD Scout</h1>
+    </div>
+    <div class="tagline">snap shelf → ranked list → eBay sold links</div>
+  </header>
+
+  <div id="upload-zone">
+    <span class="upload-title">Choose a shelf photo</span>
+    <div class="upload-btns">
+      <label class="upload-btn">
+        📷 Camera
+        <input type="file" accept="image/*" capture="environment" onchange="handleFile(this.files[0])">
+      </label>
+      <label class="upload-btn">
+        🖼️ Gallery
+        <input type="file" accept="image/*" onchange="handleFile(this.files[0])">
+      </label>
+    </div>
+  </div>
+
+  <div id="preview-wrap">
+    <img id="preview-img" src="" alt="shelf">
+    <div class="retake-btns">
+      <label class="retake-btn">↺ retake<input type="file" accept="image/*" capture="environment" onchange="handleFile(this.files[0])"></label>
+      <label class="retake-btn">🖼️ gallery<input type="file" accept="image/*" onchange="handleFile(this.files[0])"></label>
+    </div>
+  </div>
+
+  <button id="analyze-btn" onclick="analyze()">Scan shelf →</button>
+  <div id="status"><span class="status-dot"></span><span id="status-text">Reading titles from image...</span></div>
+
+  <div id="results">
+    <div class="results-header">
+      <h2>Results</h2>
+      <button id="reset-btn" onclick="reset()">↩ new scan</button>
+    </div>
+    <div id="results-body"></div>
+    <button class="copy-btn" id="copy-btn" onclick="copyList()">copy full list</button>
+  </div>
+</div>
+
+<script>
+var imageBase64 = null;
+var allTitles = {};
+var SERVER = 'https://dvd-scout-server-production.up.railway.app';
+
+function ebayUrl(title) {
+  return 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(title + ' DVD') + '&LH_Sold=1&LH_Complete=1&LH_ItemCondition=4000&_sop=13';
+}
+
+function handleFile(file) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    imageBase64 = ev.target.result.split(',')[1];
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('preview-wrap').style.display = 'block';
+    document.getElementById('upload-zone').style.display = 'none';
+    document.getElementById('analyze-btn').style.display = 'block';
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('analyze-btn').textContent = 'Scan shelf →';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('status').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function analyze() {
+  var btn = document.getElementById('analyze-btn');
+  var status = document.getElementById('status');
+  btn.disabled = true;
+  btn.textContent = 'Scanning...';
+  status.style.display = 'block';
+
+  try {
+    var resp = await fetch(SERVER + '/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: imageBase64 })
+    });
+    var data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    allTitles = data;
+    renderResults(data);
+  } catch(e) {
+    document.getElementById('status-text').textContent = 'Something went wrong. Try again.';
+    btn.disabled = false;
+    btn.textContent = 'Scan shelf →';
+    return;
+  }
+
+  status.style.display = 'none';
+  btn.style.display = 'none';
+}
+
+function renderResults(data) {
+  var body = document.getElementById('results-body');
+  body.innerHTML = '';
+  var sections = [
+    { key:'hot', label:'Pull these first', badge:'HOT', cls:'badge-hot', rowCls:'hot-row' },
+    { key:'worth_it', label:'Worth grabbing', badge:'WORTH IT', cls:'badge-ok', rowCls:'' },
+    { key:'skip', label:'Leave these', badge:'SKIP', cls:'badge-skip', rowCls:'' }
+  ];
+  sections.forEach(function(sec) {
+    var titles = data[sec.key];
+    if (!titles || !titles.length) return;
+    var lbl = document.createElement('div');
+    lbl.className = 'section-label';
+    lbl.innerHTML = sec.label + ' <span class="count-pill">' + titles.length + '</span>';
+    body.appendChild(lbl);
+    titles.forEach(function(title) {
+      var row = document.createElement('div');
+      row.className = 'title-row ' + sec.rowCls;
+      row.innerHTML = '<span class="title-name" title="' + title.replace(/"/g,'&quot;') + '">' + title + '</span>' +
+        '<div class="row-right">' +
+        '<span class="badge ' + sec.cls + '">' + sec.badge + '</span>' +
+        '<a class="ebay-link" href="' + ebayUrl(title) + '" target="_blank">sold ↗</a>' +
+        '</div>';
+      body.appendChild(row);
+    });
+  });
+  document.getElementById('results').style.display = 'block';
+}
+
+function copyList() {
+  var lines = [];
+  if (allTitles.hot && allTitles.hot.length) { lines.push('=== PULL FIRST ==='); allTitles.hot.forEach(function(t){lines.push(t);}); }
+  if (allTitles.worth_it && allTitles.worth_it.length) { lines.push('\n=== WORTH IT ==='); allTitles.worth_it.forEach(function(t){lines.push(t);}); }
+  if (allTitles.skip && allTitles.skip.length) { lines.push('\n=== SKIP ==='); allTitles.skip.forEach(function(t){lines.push(t);}); }
+  navigator.clipboard.writeText(lines.join('\n'));
+  var btn = document.getElementById('copy-btn');
+  btn.textContent = '✓ copied';
+  setTimeout(function(){ btn.textContent = 'copy full list'; }, 2000);
+}
+
+function reset() {
+  imageBase64 = null;
+  allTitles = {};
+  document.getElementById('upload-zone').style.display = 'block';
+  document.getElementById('preview-wrap').style.display = 'none';
+  document.getElementById('analyze-btn').style.display = 'none';
+  document.getElementById('analyze-btn').disabled = false;
+  document.getElementById('analyze-btn').textContent = 'Scan shelf →';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('status').style.display = 'none';
+}
+</script>
+</body>
+</html>
