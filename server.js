@@ -55,31 +55,39 @@ const server = http.createServer(async (req, res) => {
       const imageMediaType = mediaType || "image/jpeg";
 
       const isBook = category === "books";
-      const prompt = isBook
-        ? `You are an eBay book reseller assistant. Look at this image of books on a shelf.
-Extract every readable book title and author visible, reading COLUMN BY COLUMN: start at the TOP of the leftmost column, read DOWN to the bottom, then move to the next column and read TOP to BOTTOM, repeating until all columns are done.
-Also read the publisher if visible on the spine.
-For each title assign a category:
-- HOT: Strong eBay sell-through $8+. Textbooks, first editions, out of print, collectible, niche subjects, popular series, hardcovers from well-known authors, self-help bestsellers, technical manuals.
-- WORTH_IT: Decent sellers $4-8. Recognizable titles, popular fiction, moderate demand.
-- SKIP: Oversaturated, low value $1-3. Common paperbacks, book club editions, heavily supplied titles.
-- NOT_SURE: Titles you can partially read but are not confident about.
-Return ALL titles as a SINGLE array in column-by-column order. Do NOT group by category.
-Respond ONLY with valid JSON, no markdown:
-{"items":[{"title":"Title","studio":"Publisher","author":"Author","category":"HOT"}]}`
-        : `You are an eBay DVD reseller assistant. Look at this image of DVDs or Blu-rays on a shelf.
-Extract every readable movie or TV title visible, reading COLUMN BY COLUMN: start at the TOP of the leftmost column, read DOWN to the bottom, then move to the next column and read TOP to BOTTOM, repeating until all columns are done.
-Also read the studio name if visible on the spine (e.g. Warner Bros, Universal, Sony, Paramount, Disney, MGM, Lionsgate).
-For each title assign a category:
-- HOT: Strong eBay sell-through $8+. Popular action/thriller, cult classics, collector sets, complete TV seasons, Blu-rays, Disney, Marvel/DC, Nicolas Cage, Arnold, Stallone, Denzel, Tarantino, Scorsese, Coen Brothers, horror classics, limited releases.
-- WORTH_IT: Decent sellers $4-8. Recognizable titles with moderate demand.
-- SKIP: Oversaturated, low value $1-3. Common titles with huge supply.
-- NOT_SURE: Titles you can partially read but are not confident about.
-Return ALL titles as a SINGLE array in column-by-column order. Do NOT group by category.
-Respond ONLY with valid JSON, no markdown:
-{"items":[{"title":"Title","studio":"Studio","category":"HOT"}]}`;
 
-      const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      // PASS 1: Read spines from image
+      const pass1Prompt = isBook
+        ? `You are an eBay book reseller assistant. Carefully examine this shelf image.
+FIRST identify the physical layout — there are three possible arrangements:
+1. VERTICAL COLUMNS: Books standing upright side by side in columns. Read each column TOP TO BOTTOM, starting from the leftmost column and moving right.
+2. HORIZONTAL STACKS: Books stacked flat in piles. Read each pile TOP TO BOTTOM, starting from the leftmost pile and moving right.
+3. MULTIPLE SHELVES: Books standing upright across multiple horizontal shelves (like a bookcase). Read LEFT TO RIGHT across the top shelf, then LEFT TO RIGHT across the next shelf down, continuing to the bottom shelf.
+Choose the layout that best matches what you see, then read ALL titles in that order.
+For each spine, read it CHARACTER BY CHARACTER. Do not guess — if you cannot read a character clearly, mark the whole title as low_confidence=true.
+Also read the publisher and author if visible.
+Assign a value category:
+- HOT: Textbooks, first editions, out of print, collectible, niche subjects, popular series hardcovers, self-help bestsellers, technical manuals. $8+
+- WORTH_IT: Recognizable titles, popular fiction, moderate demand. $4-8
+- SKIP: Common paperbacks, book club editions, oversupplied titles. $1-3
+Return a SINGLE array in the correct reading order. Respond ONLY with valid JSON, no markdown:
+{"items":[{"title":"Exact title as read","studio":"Publisher","author":"Author","category":"HOT","low_confidence":false}]}`
+        : `You are an eBay DVD reseller assistant. Carefully examine this shelf image.
+FIRST identify the physical layout — there are three possible arrangements:
+1. VERTICAL COLUMNS: DVDs standing upright side by side in columns. Read each column TOP TO BOTTOM, starting from the leftmost column and moving right.
+2. HORIZONTAL STACKS: DVDs stacked flat in piles. Read each pile TOP TO BOTTOM, starting from the leftmost pile and moving right.
+3. MULTIPLE SHELVES: DVDs standing upright across multiple horizontal shelves (like a bookcase). Read LEFT TO RIGHT across the top shelf, then LEFT TO RIGHT across the next shelf down, continuing to the bottom shelf.
+Choose the layout that best matches what you see, then read ALL titles in that order.
+For each spine, read it CHARACTER BY CHARACTER. Do not guess — if you cannot read characters clearly, mark the title as low_confidence=true.
+Also read the studio name if visible (e.g. Warner Bros, Universal, Sony, Paramount, Disney, MGM, Lionsgate).
+Assign a value category:
+- HOT: Popular action/thriller, cult classics, collector sets, complete TV seasons, Blu-rays, Disney, Marvel/DC, Cage, Arnold, Stallone, Denzel, Tarantino, Scorsese, horror classics. $8+
+- WORTH_IT: Recognizable titles with moderate demand. $4-8
+- SKIP: Common oversupplied titles. $1-3
+Return a SINGLE array in the correct reading order. Respond ONLY with valid JSON, no markdown:
+{"items":[{"title":"Exact title as read","studio":"Studio","category":"HOT","low_confidence":false}]}`;
+
+      const pass1Response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -88,35 +96,85 @@ Respond ONLY with valid JSON, no markdown:
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-5",
-          max_tokens: 2000,
+          max_tokens: 3000,
           messages: [{
             role: "user",
             content: [
               { type: "image", source: { type: "base64", media_type: imageMediaType, data: imageBase64 } },
-              { type: "text", text: prompt }
+              { type: "text", text: pass1Prompt }
             ]
           }]
         })
       });
 
-      const data = await apiResponse.json();
-      console.log("Anthropic status:", apiResponse.status);
+      const pass1Data = await pass1Response.json();
+      console.log("Pass 1 status:", pass1Response.status);
 
-      if (!data.content || !data.content[0]) {
-        throw new Error("No content: " + JSON.stringify(data));
+      if (!pass1Data.content || !pass1Data.content[0]) {
+        throw new Error("Pass 1 failed: " + JSON.stringify(pass1Data));
       }
 
-      const raw = data.content[0].text.trim().replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(raw);
+      const raw1 = pass1Data.content[0].text.trim().replace(/```json|```/g, "").trim();
+      const parsed1 = JSON.parse(raw1);
 
-      // Normalize to items array in shelf order
-      let items = [];
-      if (parsed.items) {
-        items = parsed.items;
-      } else {
-        ['hot','worth_it','skip','not_sure'].forEach(key => {
-          if (parsed[key]) parsed[key].forEach(i => items.push({...i, category: key.toUpperCase()}));
+      let items = parsed1.items || [];
+
+      // PASS 2: Verify low-confidence titles using web search
+      const uncertain = items.filter(i => i.low_confidence);
+      console.log(`Pass 2: verifying ${uncertain.length} uncertain titles`);
+
+      if (uncertain.length > 0) {
+        // Batch verify all uncertain titles in one AI call
+        const uncertainList = uncertain.map((i, idx) => `${idx + 1}. "${i.title}"`).join('
+');
+        const pass2Prompt = `You are an expert in movies and books. The following titles were read from ${isBook ? 'book' : 'DVD'} spines but may have been misread. For each one, determine the most likely correct title based on what was read. If a title looks correct already, keep it. If it looks like a misread, provide the corrected title and studio/publisher.
+
+Titles to verify:
+${uncertainList}
+
+Respond ONLY with valid JSON, no markdown:
+{"verified":[{"index":1,"title":"Corrected Title","studio":"Studio","confirmed":true}]}`;
+
+        const pass2Response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01"
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-5",
+            max_tokens: 2000,
+            messages: [{ role: "user", content: pass2Prompt }]
+          })
         });
+
+        const pass2Data = await pass2Response.json();
+        if (pass2Data.content && pass2Data.content[0]) {
+          const raw2 = pass2Data.content[0].text.trim().replace(/```json|```/g, "").trim();
+          const parsed2 = JSON.parse(raw2);
+
+          // Apply corrections back to items
+          if (parsed2.verified) {
+            let uncertainIdx = 0;
+            items = items.map(item => {
+              if (item.low_confidence) {
+                const correction = parsed2.verified[uncertainIdx];
+                uncertainIdx++;
+                if (correction) {
+                  return {
+                    ...item,
+                    title: correction.title || item.title,
+                    studio: correction.studio || item.studio,
+                    low_confidence: !correction.confirmed,
+                    corrected: correction.title !== item.title
+                  };
+                }
+              }
+              return item;
+            });
+          }
+        }
       }
 
       res.writeHead(200, { "Content-Type": "application/json" });
