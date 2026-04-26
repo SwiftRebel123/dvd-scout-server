@@ -129,6 +129,51 @@ Respond ONLY with valid JSON, no markdown:
     return;
   }
 
+  // Suggest lots
+  if (req.method === "POST" && req.url === "/suggest-lots") {
+    try {
+      const body = await readBody(req);
+      const { titles, category } = JSON.parse(body);
+
+      const prompt = `You are an eBay reseller expert. Here is a list of ${category === 'books' ? 'books' : 'DVDs'}:
+
+${titles}
+
+For each title, identify its genre. Then suggest the best lot groupings for eBay resale — which titles should be sold together and why. Consider series, genre, director, actor, theme, and audience. For each suggested lot give it a name, list the titles, and estimate a selling price range for the lot. Also flag any individual titles that are worth more sold alone.
+
+Respond ONLY with valid JSON, no markdown:
+{"lots":[{"name":"Lot Name","titles":["Title1","Title2"],"reason":"Why these go together","price_range":"$X-$Y"}],"sell_alone":[{"title":"Title","reason":"Why sell alone","price_range":"$X-$Y"}]}`;
+
+      const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5",
+          max_tokens: 2000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      const data = await apiResponse.json();
+      if (!data.content || !data.content[0]) throw new Error("No content: " + JSON.stringify(data));
+
+      const raw = data.content[0].text.trim().replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(raw);
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(parsed));
+    } catch (e) {
+      console.error("Suggest lots error:", e.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // Get all sales from Google Sheets
   if (req.method === "GET" && req.url === "/sales") {
     try {
