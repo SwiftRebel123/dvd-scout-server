@@ -3,6 +3,8 @@ const http = require("http");
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
+console.log("API key present:", !!ANTHROPIC_API_KEY);
+
 const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
@@ -35,7 +37,7 @@ Extract every readable movie or TV title visible. Categorize each:
 Respond ONLY with valid JSON, no markdown, no extra text:
 {"hot":["Title"],"worth_it":["Title"],"skip":["Title"]}`;
 
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
+        const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -55,16 +57,23 @@ Respond ONLY with valid JSON, no markdown, no extra text:
           })
         });
 
-        const data = await response.json();
+        const data = await apiResponse.json();
+        console.log("Anthropic response status:", apiResponse.status);
+        console.log("Anthropic response:", JSON.stringify(data).slice(0, 300));
+
+        if (!data.content || !data.content[0]) {
+          throw new Error("No content in response: " + JSON.stringify(data));
+        }
+
         const raw = data.content[0].text.trim().replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(raw);
 
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(parsed));
       } catch (e) {
-        console.error("Scan error:", e);
+        console.error("Scan error:", e.message);
         res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Something went wrong" }));
+        res.end(JSON.stringify({ error: e.message }));
       }
     });
     return;
