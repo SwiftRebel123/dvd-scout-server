@@ -57,25 +57,25 @@ const server = http.createServer(async (req, res) => {
       const isBook = category === "books";
       const prompt = isBook
         ? `You are an eBay book reseller assistant. Look at this image of books on a shelf.
-Extract every readable book title and author visible, reading LEFT TO RIGHT, TOP TO BOTTOM in shelf order.
+Extract every readable book title and author visible, reading COLUMN BY COLUMN: start at the TOP of the leftmost column, read DOWN to the bottom, then move to the next column and read TOP to BOTTOM, repeating until all columns are done.
 Also read the publisher if visible on the spine.
 For each title assign a category:
 - HOT: Strong eBay sell-through $8+. Textbooks, first editions, out of print, collectible, niche subjects, popular series, hardcovers from well-known authors, self-help bestsellers, technical manuals.
 - WORTH_IT: Decent sellers $4-8. Recognizable titles, popular fiction, moderate demand.
 - SKIP: Oversaturated, low value $1-3. Common paperbacks, book club editions, heavily supplied titles.
 - NOT_SURE: Titles you can partially read but are not confident about.
-Return ALL titles as a SINGLE array in shelf order. Do NOT group by category.
+Return ALL titles as a SINGLE array in column-by-column order. Do NOT group by category.
 Respond ONLY with valid JSON, no markdown:
 {"items":[{"title":"Title","studio":"Publisher","author":"Author","category":"HOT"}]}`
         : `You are an eBay DVD reseller assistant. Look at this image of DVDs or Blu-rays on a shelf.
-Extract every readable movie or TV title visible, reading LEFT TO RIGHT, TOP TO BOTTOM in shelf order.
+Extract every readable movie or TV title visible, reading COLUMN BY COLUMN: start at the TOP of the leftmost column, read DOWN to the bottom, then move to the next column and read TOP to BOTTOM, repeating until all columns are done.
 Also read the studio name if visible on the spine (e.g. Warner Bros, Universal, Sony, Paramount, Disney, MGM, Lionsgate).
 For each title assign a category:
 - HOT: Strong eBay sell-through $8+. Popular action/thriller, cult classics, collector sets, complete TV seasons, Blu-rays, Disney, Marvel/DC, Nicolas Cage, Arnold, Stallone, Denzel, Tarantino, Scorsese, Coen Brothers, horror classics, limited releases.
 - WORTH_IT: Decent sellers $4-8. Recognizable titles with moderate demand.
 - SKIP: Oversaturated, low value $1-3. Common titles with huge supply.
 - NOT_SURE: Titles you can partially read but are not confident about.
-Return ALL titles as a SINGLE array in shelf order. Do NOT group by category.
+Return ALL titles as a SINGLE array in column-by-column order. Do NOT group by category.
 Respond ONLY with valid JSON, no markdown:
 {"items":[{"title":"Title","studio":"Studio","category":"HOT"}]}`;
 
