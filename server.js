@@ -51,7 +51,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && req.url === "/scan") {
     try {
       const body = await readBody(req);
-      const { imageBase64, category } = JSON.parse(body);
+      const { imageBase64, category, mediaType } = JSON.parse(body);
+      const imageMediaType = mediaType || "image/jpeg";
 
       const isBook = category === "books";
       const prompt = isBook
@@ -89,7 +90,7 @@ Respond ONLY with valid JSON, no markdown:
           messages: [{
             role: "user",
             content: [
-              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageBase64 } },
+              { type: "image", source: { type: "base64", media_type: imageMediaType, data: imageBase64 } },
               { type: "text", text: prompt }
             ]
           }]
