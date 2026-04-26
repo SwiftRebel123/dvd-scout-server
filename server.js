@@ -57,25 +57,27 @@ const server = http.createServer(async (req, res) => {
       const isBook = category === "books";
       const prompt = isBook
         ? `You are an eBay book reseller assistant. Look at this image of books on a shelf.
-Extract every readable book title and author visible. Also read the publisher if visible on the spine.
-Categorize each:
+Extract every readable book title and author visible, reading LEFT TO RIGHT, TOP TO BOTTOM in shelf order.
+Also read the publisher if visible on the spine.
+For each title assign a category:
 - HOT: Strong eBay sell-through $8+. Textbooks, first editions, out of print, collectible, niche subjects, popular series, hardcovers from well-known authors, self-help bestsellers, technical manuals.
 - WORTH_IT: Decent sellers $4-8. Recognizable titles, popular fiction, moderate demand.
 - SKIP: Oversaturated, low value $1-3. Common paperbacks, book club editions, heavily supplied titles.
-- NOT_SURE: Titles you can partially read but aren't confident about.
-For each item include title, author if visible, and publisher/studio if visible on spine.
+- NOT_SURE: Titles you can partially read but are not confident about.
+Return ALL titles as a SINGLE array in shelf order. Do NOT group by category.
 Respond ONLY with valid JSON, no markdown:
-{"hot":[{"title":"Title","studio":"Publisher","author":"Author"}],"worth_it":[{"title":"Title","studio":"Publisher","author":"Author"}],"skip":[{"title":"Title","studio":"Publisher","author":"Author"}],"not_sure":[{"title":"Title","studio":"Publisher","author":"Author"}]}`
+{"items":[{"title":"Title","studio":"Publisher","author":"Author","category":"HOT"}]}`
         : `You are an eBay DVD reseller assistant. Look at this image of DVDs or Blu-rays on a shelf.
-Extract every readable movie or TV title visible. Also read the studio name if visible on the spine (e.g. Warner Bros, Universal, Sony, Paramount, Disney, MGM, Lionsgate).
-Categorize each:
+Extract every readable movie or TV title visible, reading LEFT TO RIGHT, TOP TO BOTTOM in shelf order.
+Also read the studio name if visible on the spine (e.g. Warner Bros, Universal, Sony, Paramount, Disney, MGM, Lionsgate).
+For each title assign a category:
 - HOT: Strong eBay sell-through $8+. Popular action/thriller, cult classics, collector sets, complete TV seasons, Blu-rays, Disney, Marvel/DC, Nicolas Cage, Arnold, Stallone, Denzel, Tarantino, Scorsese, Coen Brothers, horror classics, limited releases.
 - WORTH_IT: Decent sellers $4-8. Recognizable titles with moderate demand.
 - SKIP: Oversaturated, low value $1-3. Common titles with huge supply.
-- NOT_SURE: Titles you can partially read but aren't confident about.
-For each item include title and studio if visible.
+- NOT_SURE: Titles you can partially read but are not confident about.
+Return ALL titles as a SINGLE array in shelf order. Do NOT group by category.
 Respond ONLY with valid JSON, no markdown:
-{"hot":[{"title":"Title","studio":"Studio"}],"worth_it":[{"title":"Title","studio":"Studio"}],"skip":[{"title":"Title","studio":"Studio"}],"not_sure":[{"title":"Title","studio":"Studio"}]}`;
+{"items":[{"title":"Title","studio":"Studio","category":"HOT"}]}`;
 
       const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -107,8 +109,18 @@ Respond ONLY with valid JSON, no markdown:
       const raw = data.content[0].text.trim().replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(raw);
 
+      // Normalize to items array in shelf order
+      let items = [];
+      if (parsed.items) {
+        items = parsed.items;
+      } else {
+        ['hot','worth_it','skip','not_sure'].forEach(key => {
+          if (parsed[key]) parsed[key].forEach(i => items.push({...i, category: key.toUpperCase()}));
+        });
+      }
+
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(parsed));
+      res.end(JSON.stringify({ items }));
     } catch (e) {
       console.error("Scan error:", e.message);
       res.writeHead(500, { "Content-Type": "application/json" });
